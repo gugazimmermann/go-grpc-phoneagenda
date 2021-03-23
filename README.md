@@ -1,5 +1,11 @@
 # Phone Book with GO, gRPC, Protobuf, Docker And MongoDB
 
+![cover](imgs/cover.png)
+
+In this article we will create a simple phone book using Go, Protobuf, gRPC and MongoDB running inside a Docker Container.
+
+The phone book will be a CRUD (create, read, update and delete), and in the end streaming all persons created.
+
 ## Install GO
 
 In a Ubuntu fresh install you will need to install GO (https://golang.org/doc/install):
@@ -140,8 +146,6 @@ source $HOME/.bashrc
 
 ![Go Phonebook Install](imgs/go_phonebook.png)
 
-SNAPSHOT 1
-
 ### MongoDB and Mongo Express in a Docker Container
 
 create `docker-compose.yml` (VSCode may ask for some extensions, like Docker and YAML, just install)
@@ -237,15 +241,6 @@ mongo ${MONGO_DB} \
 
 echo 'User: ${MONGO_USERNAME} create to database ${MONGO_DB}';
 
-mongo testDB \
- --username ${MONGO_USERNAME} \
- --password ${MONGO_PASSWORD} \
- --authenticationDatabase admin \
- --host localhost \
- --port 27017 \
- --eval "db.createUser({user: '${MONGO_USERNAME}', pwd: '${MONGO_PASSWORD}', roles:[{role:'dbOwner', db: 'testDB'}]});"
-
-echo 'User: ${MONGO_USERNAME} create to database testDB';
 EOF
 echo "created..."
 
@@ -296,26 +291,27 @@ option go_package = "phonebookpb/phonebookpb";
 import "google/protobuf/timestamp.proto";
 
 message Person {
- string id = 1;
- string name = 2;
- string email = 3;
+  string id = 1;
+  string name = 2;
+  string email = 3;
 
- enum PhoneType {
- MOBILE = 0;
- HOME = 1;
- WORK = 2;
- }
+  enum PhoneType {
+    MOBILE = 0;
+    HOME = 1;
+    WORK = 2;
+  }
 
- message PhoneNumber {
- string number = 1;
- PhoneType type = 2;
- }
+  message PhoneNumber {
+    string number = 1;
+    PhoneType type = 2;
+  }
 
- repeated PhoneNumber phones = 4;
- google.protobuf.Timestamp last_updated = 5;
+  repeated PhoneNumber phones = 4;
+  google.protobuf.Timestamp last_updated = 5;
 }
 
 service PhoneBookService {};
+
 ```
 
 After crate the `.proto` we need to generate the code, so we can run:
@@ -947,6 +943,8 @@ func listPerson(c phonebookpb.PhoneBookServiceClient) {
 ```
 
 We get the stream from ListPerson, loop on if until end of file and then print the result :)
+
+To have a better view of the streaming you can create more persons inside the DB.
 
 ![list person](imgs/list_person.png)
 
