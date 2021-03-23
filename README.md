@@ -373,7 +373,7 @@ func main() {
 	s := grpc.NewServer(opts...)
 	phonebookpb.RegisterPhoneBookServiceServer(s, &server{})
 
-	// Start a GO Routine
+	// start a GO Routine
 	go func() {
 		fmt.Println("PhoneBook Server Started...")
 		if err := s.Serve(l); err != nil {
@@ -381,11 +381,11 @@ func main() {
 		}
 	}()
 
-	// Wait to exit (Ctrl+C)
+	// wit to exit (Ctrl+C)
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, os.Interrupt)
 
-	// Block the channel until the signal is received
+	// block the channel until the signal is received
 	<-ch
 	fmt.Println("Stopping PhoneBook Server...")
 	s.Stop()
@@ -396,7 +396,7 @@ func main() {
 
 ```
 
-In this this file we start a listener to localhost in port 50051 (gRPC default), create the phone book service with empty options, then we startthe server inside a Go Routine.
+In this this file we start a listener to localhost in port 50051 (gRPC default), create the phone book service with empty options, then we start the server inside a Go Routine.
 
 We create a channel to wait the exit command (ctrl+c), and when we receive it we stop everyting.
 
@@ -551,12 +551,12 @@ Back to the `phonebookpb/phonebook.proto` file, we need to add the request and r
 ```Protobuf
 ...
 
-message CreatePersonRequest { Person person = 1; }
+message PersonRequest { Person person = 1; }
 
-message CreatePersonResponse { Person person = 1; } // will have the ID
+message PersonResponse { Person person = 1; }
 
 service PhoneBookService {
- rpc CreatePerson(CreatePersonRequest) returns (CreatePersonResponse) {};
+  rpc CreatePerson(PersonRequest) returns (PersonResponse) {};
 };
 
 ```
@@ -566,35 +566,30 @@ Generate the code!
 Back to `server/server.go` we need the function CreatePerson where we will receive the request, transform into a personItem, store into the database, receive the ID, and then send the response to the client.
 
 ```Go
-func (*server) CreatePerson(ctx context.Context, req *phonebookpb.CreatePersonRequest) (*phonebookpb.CreatePersonResponse, error) {
-
+func (*server) CreatePerson(ctx context.Context, req *phonebookpb.PersonRequest) (*phonebookpb.PersonResponse, error) {
 	person := req.GetPerson()
 	fmt.Printf("CreatePerson called with: %v\n", person)
-
 	data := personItem{
-		Name:    person.GetName(),
-		Email:    person.GetEmail(),
-		Phones:   person.GetPhones(),
+		Name:        person.GetName(),
+		Email:       person.GetEmail(),
+		Phones:      person.GetPhones(),
 		LastUpdated: timestamppb.Now(),
 	}
-
 	res, err := collection.InsertOne(context.Background(), data)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, fmt.Sprintf(" Internal Error: %v", err))
 	}
-
 	oid, ok := res.InsertedID.(primitive.ObjectID)
 	if !ok {
-		return nil, status.Errorf(codes.Internal, fmt.Sprintf("Cannot convert to OID"))
+		return nil, status.Errorf(codes.Internal, "Cannot convert to OID")
 	}
 	data.ID = oid
-
-	return &phonebookpb.CreatePersonResponse{
+	return &phonebookpb.PersonResponse{
 		Person: &phonebookpb.Person{
-			Id:     data.ID.Hex(),
-			Name:    data.Name,
-			Email:    data.Email,
-			Phones:   data.Phones,
+			Id:          data.ID.Hex(),
+			Name:        data.Name,
+			Email:       data.Email,
+			Phones:      data.Phones,
 			LastUpdated: data.LastUpdated,
 		},
 	}, nil
@@ -606,11 +601,11 @@ We need a personItem struct, and we just need it to receive the Id from MongoDB 
 
 ```Go
 type personItem struct {
-	ID     primitive.ObjectID        `bson:"_id,omitempty"`
-	Name    string              `bson:"name"`
-	Email    string              `bson:"email"`
-	Phones   []*phonebookpb.Person_PhoneNumber `bson:"phones"`
-	LastUpdated *timestamppb.Timestamp      `bson:"last_updated,omitempty"`
+	ID          primitive.ObjectID                `bson:"_id,omitempty"`
+	Name        string                            `bson:"name"`
+	Email       string                            `bson:"email"`
+	Phones      []*phonebookpb.Person_PhoneNumber `bson:"phones"`
+	LastUpdated *timestamppb.Timestamp            `bson:"last_updated,omitempty"`
 }
 ```
 
@@ -643,21 +638,20 @@ func main() {
 func createPerson(c phonebookpb.PhoneBookServiceClient) {
 	fmt.Println("Creating the person...")
 	person := &phonebookpb.Person{
-		Name: "Guga Zimmermann",
+		Name:  "Guga Zimmermann",
 		Email: "gugazimmermann@gmail.com",
 		Phones: []*phonebookpb.Person_PhoneNumber{
 			{
 				Number: "+55 47 98870-4247",
-				Type:  phonebookpb.Person_MOBILE,
+				Type:   phonebookpb.Person_MOBILE,
 			},
 			{
 				Number: "+55 47 XXXXX-XXXX",
-				Type:  phonebookpb.Person_HOME,
+				Type:   phonebookpb.Person_HOME,
 			},
 		},
 	}
-
-	res, err := c.CreatePerson(context.Background(), &phonebookpb.CreatePersonRequest{Person: person})
+	res, err := c.CreatePerson(context.Background(), &phonebookpb.PersonRequest{Person: person})
 	if err != nil {
 		fmt.Printf("Error while creating the person: %v\n", err)
 	}
@@ -665,6 +659,8 @@ func createPerson(c phonebookpb.PhoneBookServiceClient) {
 }
 
 ```
+
+Open two terminal windows, in one you can start the server `go run server/server.go` and on the other the client `go run client/client.go`.
 
 ![create_person](imgs/create_person.png)
 
