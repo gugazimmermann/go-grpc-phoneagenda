@@ -30,10 +30,20 @@ message PersonRequest { Person person = 1; }
 
 message PersonResponse { Person person = 1; }
 
-message ReadPersonRequest { string person_id = 1; }
+message PersonIdRequest { string person_id = 1; }
+
+message DeleteResponse { int64 deleted = 1; }
+
+message ListPersonResquest {};
 
 service PhoneBookService {
   rpc CreatePerson(PersonRequest) returns (PersonResponse) {};
 
-  rpc ReadPerson(ReadPersonRequest) returns (PersonResponse) {};
+  rpc ReadPerson(PersonIdRequest) returns (PersonResponse) {};
+
+  rpc UpdatePerson(PersonRequest) returns (PersonResponse) {};
+
+  rpc DeletePerson(PersonIdRequest) returns (DeleteResponse) {};
+
+  rpc ListPerson(ListPersonResquest) returns (stream PersonResponse) {};
 };

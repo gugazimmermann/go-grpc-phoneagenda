@@ -674,12 +674,12 @@ And if you open the Browser and go to `http://localhost:8081` (mongo express), y
 
 ```Protobuf
 
-message ReadPersonRequest { string person_id = 1; }
+message PersonIdRequest { string person_id = 1; }
 
 service PhoneBookService {
   rpc CreatePerson(PersonRequest) returns (PersonResponse) {};
 
-  rpc ReadPerson(ReadPersonRequest) returns (PersonResponse) {};
+  rpc ReadPerson(PersonIdRequest) returns (PersonResponse) {};
 };
 
 ```
@@ -687,7 +687,7 @@ service PhoneBookService {
 SERVER: We receive the person ID request, transform in a mongoDB objectID, try to findOne in mongoDB, and then return the Person as a response.
 
 ```Go
-func (*server) ReadPerson(ctx context.Context, req *phonebookpb.ReadPersonRequest) (*phonebookpb.PersonResponse, error) {
+func (*server) ReadPerson(ctx context.Context, req *phonebookpb.PersonIdRequest) (*phonebookpb.PersonResponse, error) {
 	personId := req.GetPersonId()
 	fmt.Printf("ReadPerson called with: %v\n", personId)
 	oid, err := primitive.ObjectIDFromHex(personId)
@@ -719,9 +719,9 @@ func readPerson(c phonebookpb.PhoneBookServiceClient) {
 	// CHANGE TO THE ID THAT YOU RECEIVED WHEN CREATE THE PERSON
 	// YOU CAN TRY 605812e409be8dac8d59b5af TO SEE code = NotFound
 	// AND xxxx TO SEE code = InvalidArgument
-	personId := "605805238428bbcb74e710df"
+	personId := "60594949c5d0fac6fd42fc11"
 	fmt.Printf("Reading person with ID: %v\n", personId)
-	res, err := c.ReadPerson(context.Background(), &phonebookpb.ReadPersonRequest{PersonId: personId})
+	res, err := c.ReadPerson(context.Background(), &phonebookpb.PersonIdRequest{PersonId: personId})
 	if err != nil {
 		fmt.Printf("Error while reading the person: %v\n", err)
 	}
@@ -734,3 +734,218 @@ func readPerson(c phonebookpb.PhoneBookServiceClient) {
 
 # Update Person
 
+`.proto`:
+
+```Protobuf
+rpc UpdatePerson(PersonRequest) returns (PersonResponse) {};
+```
+
+SERVER:
+```Go
+func personToPB(data *personItem) *phonebookpb.Person {
+	return &phonebookpb.Person{
+		Id:          data.ID.Hex(),
+		Name:        data.Name,
+		Email:       data.Email,
+		Phones:      data.Phones,
+		LastUpdated: data.LastUpdated,
+	}
+}
+
+```
+We can create a func to transform the personItem struct in a pointer to phonebookpb.Person, so we cant chance everytime.
+
+```Go
+func (*server) UpdatePerson(ctx context.Context, req *phonebookpb.PersonRequest) (*phonebookpb.PersonResponse, error) {
+	person := req.GetPerson()
+	fmt.Printf("CreatePerson called with: %v\n", person)
+	oid, err := primitive.ObjectIDFromHex(person.GetId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Cannot parse ID")
+	}
+	data := &personItem{
+		Name:        person.GetName(),
+		Email:       person.GetEmail(),
+		Phones:      person.GetPhones(),
+		LastUpdated: timestamppb.Now(),
+	}
+	_, err = collection.ReplaceOne(context.Background(), primitive.M{"_id": oid}, data)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, fmt.Sprintf("Cannot update person: %v", err))
+	}
+	return &phonebookpb.PersonResponse{
+		Person: personToPB(data),
+	}, nil
+}
+
+```
+And to update the person we need to get the request with the changed person, transform the ID into a MongoDB ID object, replace the person in the database and return the response.
+
+CLIENT:
+
+```Go
+func updatePerson(c phonebookpb.PhoneBookServiceClient) {
+	// CHANGE TO THE ID THAT YOU RECEIVED WHEN CREATE THE PERSON
+	// YOU CAN TRY 605812e409be8dac8d59b5af TO SEE code = NotFound
+	// AND xxxx TO SEE code = InvalidArgument
+	personId := "60594949c5d0fac6fd42fc11"
+	fmt.Printf("Update person with ID: %v\n", personId)
+	person := &phonebookpb.Person{
+		Id:    personId,
+		Name:  "José Augusto Zimmermann de Negreiros",
+		Email: "jose.augusto@x-team.com",
+		Phones: []*phonebookpb.Person_PhoneNumber{
+			{
+				Number: "+55 47 98870-4247",
+				Type:   phonebookpb.Person_WORK,
+			},
+		},
+	}
+	res, err := c.UpdatePerson(context.Background(), &phonebookpb.PersonRequest{Person: person})
+	if err != nil {
+		fmt.Printf("Error while updating the person: %v\n", err)
+	}
+	fmt.Printf("Person: %v\n", res)
+}
+
+```
+
+Again the client is very simple, just create the person and send the request.
+
+OBS: I changed machines, so the print is different :)
+
+![update person](imgs/update_person.png)
+
+![update person mongo](imgs/update_person_mongo.png)
+
+# Delete Person
+
+`.proto`
+
+```Protobuf
+message DeleteResponse { int64 deleted = 1; }
+
+service PhoneBookService {
+  rpc CreatePerson(PersonRequest) returns (PersonResponse) {};
+
+  rpc ReadPerson(PersonIdRequest) returns (PersonResponse) {};
+
+  rpc UpdatePerson(PersonRequest) returns (PersonResponse) {};
+
+  rpc DeletePerson(PersonIdRequest) returns (DeleteResponse) {};
+};
+```
+
+SERVER
+
+```Go
+func (*server) DeletePerson(ctx context.Context, req *phonebookpb.PersonIdRequest) (*phonebookpb.DeleteResponse, error) {
+	personId := req.GetPersonId()
+	fmt.Printf("DeletePerson called with: %v\n", personId)
+	oid, err := primitive.ObjectIDFromHex(personId)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Cannot parse ID")
+	}
+	res, err := collection.DeleteOne(context.Background(), primitive.M{"_id": oid})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, fmt.Sprintf("Cannot delete person: %v", err))
+	}
+	if res.DeletedCount == 0 {
+		return nil, status.Errorf(codes.Internal, fmt.Sprintf("Cannot delete person: %v", err))
+	}
+	return &phonebookpb.DeleteResponse{
+		Deleted: res.DeletedCount,
+	}, nil
+}
+
+```
+
+CLIENT: 
+
+```Go
+func deletePerson(c phonebookpb.PhoneBookServiceClient) {
+	// CHANGE TO THE ID THAT YOU RECEIVED WHEN CREATE THE PERSON
+	// YOU CAN TRY 605812e409be8dac8d59b5af TO SEE code = NotFound
+	// AND xxxx TO SEE code = InvalidArgument
+	personId := "60594949c5d0fac6fd42fc11"
+	fmt.Printf("Deleting person with ID: %v\n", personId)
+	res, err := c.DeletePerson(context.Background(), &phonebookpb.PersonIdRequest{PersonId: personId})
+	if err != nil {
+		fmt.Printf("Error while deleting the person: %v\n", err)
+	}
+	fmt.Printf("Person: %v\n", res)
+}
+
+```
+![delete person](imgs/delete_person.png)
+
+![delete person mongo](imgs/delete_person_mongo.png)
+
+# List Person
+
+Now to List persons we will create a streaming just for fun!
+
+```Protoc
+message ListPersonResquest {};
+
+service PhoneBookService {
+
+  ...
+
+  rpc ListPerson(ListPersonResquest) returns (stream PersonResponse) {};
+};
+```
+We don't need to send a request, so a empty message is ok, and the response will be a stream.
+
+SERVER:
+
+```Go
+func (*server) ListPerson(req *phonebookpb.ListPersonResquest, stream phonebookpb.PhoneBookService_ListPersonServer) error {
+	fmt.Println("ListPerson start stream")
+	cur, err := collection.Find(context.Background(), bson.D{})
+	if err != nil {
+		return status.Errorf(codes.Internal, fmt.Sprintf("Unknown Internal Error: %v", err))
+	}
+	defer cur.Close(context.Background())
+	for cur.Next(context.Background()) {
+		data := &personItem{}
+		if err := cur.Decode(data); err != nil {
+			return status.Errorf(codes.Internal, fmt.Sprintf("Cannot decoding data: %v", err))
+		}
+		stream.Send(&phonebookpb.PersonResponse{Person: personToPB(data)})
+	}
+	if err = cur.Err(); err != nil {
+		return status.Errorf(codes.Internal, fmt.Sprintf("Unknown Internal Error: %v", err))
+	}
+	return nil
+}
+
+```
+
+The collection.Find will get all persons in database and put in a cursor (defer close when done), we do a for loop to get the data from the cursor, decode and send as a stream back to the client.
+
+CLIENT:
+
+```Go
+func listPerson(c phonebookpb.PhoneBookServiceClient) {
+	fmt.Println("listPerson...")
+	stream, err := c.ListPerson(context.Background(), &phonebookpb.ListPersonResquest{})
+	if err != nil {
+		fmt.Printf("Error while calling ListPerson RPC: %v\n", err)
+	}
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatalf("Something happened while receive stream: %v\n", err)
+		}
+		fmt.Println(res.GetPerson())
+	}
+}
+```
+
+We get the stream from ListPerson, loop on if until end of file and then print the result :)
+
+![list person](imgs/list_person.png)
