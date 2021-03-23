@@ -123,7 +123,7 @@ sudo chmod +x /usr/local/bin/docker-compose
 
 ![Docker Compose Install](imgs/docker_compose_install.png)
 
-## Phone Book Project
+# Phone Book Project
 
 Let's create a project from your home folder, init a Go Module (we are not running inside GO's default project folder), install Protobuf (https://github.com/golang/protobuf) and gRPC-Go (https://github.com/grpc/grpc-go):
 
@@ -146,7 +146,7 @@ source $HOME/.bashrc
 
 ![Go Phonebook Install](imgs/go_phonebook.png)
 
-### MongoDB and Mongo Express in a Docker Container
+## MongoDB and Mongo Express in a Docker Container
 
 create `docker-compose.yml` (VSCode may ask for some extensions, like Docker and YAML, just install)
 
@@ -270,12 +270,13 @@ Create a file `.gitignore` and add
 
 ```
 .env
+
 init-mongo.sh
 ```
 
 Now we will not send files with password to github.
 
-# Phone Book Project
+## Start Coding
 
 First we will create a simple `.proto` with the phonebook... In this file we will have a Person, with id, name and email, and each person can have one or more phones with number and type. And for the type we need just mobile, home or work. And a good thing to have is the date that the information was last updated.
 
@@ -603,6 +604,7 @@ type personItem struct {
 	Phones      []*phonebookpb.Person_PhoneNumber `bson:"phones"`
 	LastUpdated *timestamppb.Timestamp            `bson:"last_updated,omitempty"`
 }
+
 ```
 
 We need a Client, so let's create `client/client.go`. In this file we do a insecure dial to localhost 50051 (your server without SSL), put a defer close to finish when done, and then start the service client. To create a new person inside your PhoneBook, we need the function `createPerson` to create the person object and send to the server.
@@ -830,6 +832,7 @@ service PhoneBookService {
 
   rpc DeletePerson(PersonIdRequest) returns (DeleteResponse) {};
 };
+
 ```
 
 SERVER
@@ -890,6 +893,7 @@ service PhoneBookService {
 
   rpc ListPerson(ListPersonResquest) returns (stream PersonResponse) {};
 };
+
 ```
 We don't need to send a request, so a empty message is ok, and the response will be a stream.
 
@@ -940,6 +944,7 @@ func listPerson(c phonebookpb.PhoneBookServiceClient) {
 		fmt.Println(res.GetPerson())
 	}
 }
+
 ```
 
 We get the stream from ListPerson, loop on if until end of file and then print the result :)
@@ -1001,6 +1006,7 @@ service PhoneBookService {
 
   rpc ListPerson(ListPersonResquest) returns (stream PersonResponse) {};
 };
+
 ```
 
 `server/server.go`
