@@ -30,6 +30,10 @@ message PersonRequest { Person person = 1; }
 
 message PersonResponse { Person person = 1; }
 
+message ReadPersonRequest { string person_id = 1; }
+
 service PhoneBookService {
   rpc CreatePerson(PersonRequest) returns (PersonResponse) {};
+
+  rpc ReadPerson(ReadPersonRequest) returns (PersonResponse) {};
 };

@@ -120,3 +120,26 @@ func (*server) CreatePerson(ctx context.Context, req *phonebookpb.PersonRequest)
 		},
 	}, nil
 }
+
+func (*server) ReadPerson(ctx context.Context, req *phonebookpb.ReadPersonRequest) (*phonebookpb.PersonResponse, error) {
+	personId := req.GetPersonId()
+	fmt.Printf("ReadPerson called with: %v\n", personId)
+	oid, err := primitive.ObjectIDFromHex(personId)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Cannot parse ID")
+	}
+	data := &personItem{}
+	res := collection.FindOne(context.Background(), primitive.M{"_id": oid})
+	if err := res.Decode(data); err != nil {
+		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("Cannot found person with the specified ID: %v", err))
+	}
+	return &phonebookpb.PersonResponse{
+		Person: &phonebookpb.Person{
+			Id:          data.ID.Hex(),
+			Name:        data.Name,
+			Email:       data.Email,
+			Phones:      data.Phones,
+			LastUpdated: data.LastUpdated,
+		},
+	}, nil
+}

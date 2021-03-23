@@ -673,51 +673,46 @@ And if you open the Browser and go to `http://localhost:8081` (mongo express), y
 `.proto`
 
 ```Protobuf
+
 message ReadPersonRequest { string person_id = 1; }
 
-message ReadPersonResponse { Person person = 1; }
+service PhoneBookService {
+  rpc CreatePerson(PersonRequest) returns (PersonResponse) {};
 
-```
+  rpc ReadPerson(ReadPersonRequest) returns (PersonResponse) {};
+};
 
-inside `PhoneBookService`
-
-```Protobuf
-rpc ReadPerson(ReadPersonRequest) returns (ReadPersonResponse) {};
 ```
 
 SERVER: We receive the person ID request, transform in a mongoDB objectID, try to findOne in mongoDB, and then return the Person as a response.
 
 ```Go
-func (*server) ReadPerson(ctx context.Context, req *phonebookpb.ReadPersonRequest) (*phonebookpb.ReadPersonResponse, error) {
+func (*server) ReadPerson(ctx context.Context, req *phonebookpb.ReadPersonRequest) (*phonebookpb.PersonResponse, error) {
 	personId := req.GetPersonId()
 	fmt.Printf("ReadPerson called with: %v\n", personId)
-
 	oid, err := primitive.ObjectIDFromHex(personId)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, fmt.Sprintf("Cannot parse ID"))
+		return nil, status.Errorf(codes.InvalidArgument, "Cannot parse ID")
 	}
-
 	data := &personItem{}
 	res := collection.FindOne(context.Background(), primitive.M{"_id": oid})
 	if err := res.Decode(data); err != nil {
 		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("Cannot found person with the specified ID: %v", err))
 	}
-
-	return &phonebookpb.ReadPersonResponse{
+	return &phonebookpb.PersonResponse{
 		Person: &phonebookpb.Person{
-			Id:     data.ID.Hex(),
-			Name:    data.Name,
-			Email:    data.Email,
-			Phones:   data.Phones,
+			Id:          data.ID.Hex(),
+			Name:        data.Name,
+			Email:       data.Email,
+			Phones:      data.Phones,
 			LastUpdated: data.LastUpdated,
 		},
 	}, nil
-
 }
 
 ```
 
-CLIENT:  Very simple,  just send the  ID as a string to the client and wait the result.
+CLIENT: Very simple, just send the ID as a string to the client and wait the result.
 
 ```Go
 func readPerson(c phonebookpb.PhoneBookServiceClient) {
@@ -732,6 +727,7 @@ func readPerson(c phonebookpb.PhoneBookServiceClient) {
 	}
 	fmt.Printf("Person: %v\n", res)
 }
+
 ```
 
 ![read person](imgs/read_person.png)

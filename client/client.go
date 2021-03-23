@@ -18,7 +18,8 @@ func main() {
 	defer cc.Close()
 	c := phonebookpb.NewPhoneBookServiceClient(cc)
 
-	createPerson(c)
+	// createPerson(c)
+	readPerson(c)
 }
 
 func createPerson(c phonebookpb.PhoneBookServiceClient) {
@@ -42,4 +43,17 @@ func createPerson(c phonebookpb.PhoneBookServiceClient) {
 		fmt.Printf("Error while creating the person: %v\n", err)
 	}
 	fmt.Printf("Person Created: %v\n", res)
+}
+
+func readPerson(c phonebookpb.PhoneBookServiceClient) {
+	// CHANGE TO THE ID THAT YOU RECEIVED WHEN CREATE THE PERSON
+	// YOU CAN TRY 605812e409be8dac8d59b5af TO SEE code = NotFound
+	// AND xxxx TO SEE code = InvalidArgument
+	personId := "60594949c5d0fac6fd42fc11"
+	fmt.Printf("Reading person with ID: %v\n", personId)
+	res, err := c.ReadPerson(context.Background(), &phonebookpb.ReadPersonRequest{PersonId: personId})
+	if err != nil {
+		fmt.Printf("Error while reading the person: %v\n", err)
+	}
+	fmt.Printf("Person: %v\n", res)
 }
